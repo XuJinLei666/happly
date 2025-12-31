@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>致张凯艳的元旦祝福</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #050505; /* 深邃黑背景 */
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #instruction {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 14px;
+            pointer-events: none;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0.4; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="instruction">点击屏幕 开启祝福</div>
+    <canvas id="canvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let width, height;
+    let particles = [];
+    // 这里是显示的文字顺序，你可以自由修改
+    const textList = ["张凯艳", "元旦快乐", "2026", "万事胜意"]; 
+    let textIndex = 0;
+    
+    // 配置参数
+    const particleGap = 5; // 粒子密度，越小越密（也会越卡）
+    const mouseRadius = 50;
+    
+    // 初始化画布尺寸
+    function initSize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+    }
+    
+    initSize();
+    window.addEventListener('resize', initSize);
+
+    // 粒子类
+    class Particle {
+        constructor(x, y) {
+            this.x = Math.random() * width;
+            this.y = Math.random() * height;
+            this.targetX = x;
+            this.targetY = y;
+            // 随机生成金色/粉色/青色系的颜色
+            const colors = ['#FFD700', '#FF69B4', '#00FFFF', '#FFFFFF'];
+            this.color = colors[Math.floor(Math.random() * colors.length)];
+            this.size = Math.random() * 2 + 1;
+            this.vx = 0;
+            this.vy = 0;
+            this.friction = 0.92; // 摩擦力
+            this.ease = 0.15;     // 汇聚速度
+        }
+
+        update() {
+            // 计算到目标的距离
+            const dx = this.targetX - this.x;
+            const dy = this.targetY - this.y;
+            
+            // 简单的物理缓动
+            this.vx += dx * this.ease;
+            this.vy += dy * this.ease;
+            this.vx *= this.friction;
+            this.vy *= this.friction;
+            
+            this.x += this.vx;
+            this.y += this.vy;
+        }
+
+        draw() {
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // 获取文字坐标点
+    function getTextCoordinates(text) {
+        // 创建离屏 Canvas 用来扫描像素
+        const offCanvas = document.createElement('canvas');
+        const offCtx = offCanvas.getContext('2d');
+        offCanvas.width = width;
+        offCanvas.height = height;
+
+        offCtx.font = 'bold 120px Microsoft YaHei'; // 字体大小
+        offCtx.fillStyle = 'white';
+        offCtx.textAlign = 'center';
+        offCtx.textBaseline = 'middle';
+        offCtx.fillText(text, width / 2, height / 2);
+
+        const imageData = offCtx.getImageData(0, 0, width, height).data;
+        const coordinates = [];
+
+        // 扫描像素，获取非透明像素的坐标
+        for (let y = 0; y < height; y += particleGap) {
+            for (let x = 0; x < width; x += particleGap) {
+                const alpha = imageData[(y * width + x) * 4 + 3];
+                if (alpha > 128) {
+                    coordinates.push({ x, y });
+                }
+            }
+        }
+        return coordinates;
+    }
+
+    // 切换文字场景
+    function changeText() {
+        const text = textList[textIndex];
+        const coords = getTextCoordinates(text);
+        
+        // 如果现有粒子不够，补充新粒子
+        if (coords.length > particles.length) {
+            const diff = coords.length - particles.length;
+            for (let i = 0; i < diff; i++) {
+                particles.push(new Particle(width/2, height/2));
+            }
+        }
+
+        // 分配目标位置
+        // 为了让效果更酷，我们打乱数组顺序分配，这样粒子会交错飞行
+        coords.sort(() => Math.random() - 0.5);
+
+        particles.forEach((p, i) => {
+            if (i < coords.length) {
+                p.targetX = coords[i].x;
+                p.targetY = coords[i].y;
+            } else {
+                // 多余的粒子让它们随机飞走或飞向边缘
+                p.targetX = Math.random() * width;
+                p.targetY = Math.random() * height;
+            }
+        });
+
+        textIndex = (textIndex + 1) % textList.length;
+    }
+
+    // 动画循环
+    function animate() {
+        // 每一帧画一个半透明背景，形成拖尾效果
+        ctx.fillStyle = 'rgba(5, 5, 5, 0.2)';
+        ctx.fillRect(0, 0, width, height);
+
+        particles.forEach(p => {
+            p.update();
+            p.draw();
+        });
+
+        requestAnimationFrame(animate);
+    }
+
+    // 点击事件
+    window.addEventListener('click', () => {
+        changeText();
+        // 隐藏提示文字
+        const hint = document.getElementById('instruction');
+        if(hint) hint.style.display = 'none';
+    });
+    
+    // 触摸事件（兼容手机）
+    window.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        changeText();
+        const hint = document.getElementById('instruction');
+        if(hint) hint.style.display = 'none';
+    }, {passive: false});
+
+    // 启动
+    changeText(); // 先显示第一个词
+    animate();
+
+</script>
+</body>
+</html>
